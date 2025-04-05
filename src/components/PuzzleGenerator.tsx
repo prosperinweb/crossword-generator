@@ -12,9 +12,12 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { generateCrossword } from "@/lib/gemini";
 
 interface PuzzleGeneratorProps {
   onPuzzleGenerated: (puzzle: PuzzleData) => void;
+  isLoading?: boolean;
+  themeStyles?: any;
 }
 
 export interface PuzzleData {
@@ -41,58 +44,39 @@ const themes = [
 
 const PuzzleGenerator: React.FC<PuzzleGeneratorProps> = ({
   onPuzzleGenerated = () => {},
+  isLoading: externalLoading = false,
+  themeStyles,
 }) => {
-  const { currentTheme } = useTheme();
+  const { theme } = useTheme();
   const [selectedTheme, setSelectedTheme] = useState("general");
   const [difficulty, setDifficulty] = useState(50);
-  const [isLoading, setIsLoading] = useState(false);
+  const [internalLoading, setInternalLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Use external loading state if provided, otherwise use internal
+  const isLoading = externalLoading || internalLoading;
 
   const handleDifficultyChange = (value: number[]) => {
     setDifficulty(value[0]);
   };
 
   const generatePuzzle = async () => {
-    setIsLoading(true);
+    setInternalLoading(true);
     setError(null);
 
     try {
-      // Mock API call - in a real implementation, this would call the Gemini API
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock response data
-      const mockPuzzle: PuzzleData = {
-        grid: [
-          ["C", "A", "T", "", ""],
-          ["A", "", "R", "", ""],
-          ["R", "A", "E", "E", ""],
-          ["", "", "E", "", ""],
-          ["", "", "", "", ""],
-        ],
-        clues: {
-          across: {
-            "1": "Feline pet",
-            "3": "Uncommon",
-          },
-          down: {
-            "1": "Automobile",
-            "2": "Tree fluid",
-          },
-        },
-        size: 5,
-      };
-
-      onPuzzleGenerated(mockPuzzle);
+      const puzzle = await generateCrossword(selectedTheme, difficulty);
+      onPuzzleGenerated(puzzle);
     } catch (err) {
       setError("Failed to generate puzzle. Please try again.");
       console.error("Error generating puzzle:", err);
     } finally {
-      setIsLoading(false);
+      setInternalLoading(false);
     }
   };
 
   const getThemeStyles = () => {
-    switch (currentTheme) {
+    switch (theme) {
       case "vintage":
         return "bg-amber-50 text-amber-900 border-amber-200";
       case "neon":
@@ -105,7 +89,7 @@ const PuzzleGenerator: React.FC<PuzzleGeneratorProps> = ({
   };
 
   const getButtonStyles = () => {
-    switch (currentTheme) {
+    switch (theme) {
       case "vintage":
         return "bg-amber-800 hover:bg-amber-700 text-amber-50";
       case "neon":
@@ -133,7 +117,7 @@ const PuzzleGenerator: React.FC<PuzzleGeneratorProps> = ({
       <Card className={`${getThemeStyles()} transition-all duration-300`}>
         <CardHeader>
           <CardTitle
-            className={`text-center ${currentTheme === "vintage" ? "font-serif" : ""}`}
+            className={`text-center ${theme === "vintage" ? "font-serif" : ""}`}
           >
             Create Your Crossword
           </CardTitle>
@@ -143,7 +127,7 @@ const PuzzleGenerator: React.FC<PuzzleGeneratorProps> = ({
             <label className="text-sm font-medium">Puzzle Theme</label>
             <Select value={selectedTheme} onValueChange={setSelectedTheme}>
               <SelectTrigger
-                className={`w-full ${currentTheme === "neon" ? "border-purple-500 bg-gray-900" : ""}`}
+                className={`w-full ${theme === "neon" ? "border-purple-500 bg-gray-900" : ""}`}
               >
                 <SelectValue placeholder="Select a theme" />
               </SelectTrigger>
@@ -170,7 +154,7 @@ const PuzzleGenerator: React.FC<PuzzleGeneratorProps> = ({
               max={100}
               step={1}
               onValueChange={handleDifficultyChange}
-              className={currentTheme === "neon" ? "bg-purple-900" : ""}
+              className={theme === "neon" ? "bg-purple-900" : ""}
             />
           </div>
 

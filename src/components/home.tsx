@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Settings, Moon, Sun, Palette } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Settings, Moon, Sun, Palette, Share2, Download } from "lucide-react";
 import PuzzleGenerator from "./PuzzleGenerator";
 import CrosswordGrid from "./CrosswordGrid";
 import { useTheme } from "./ThemeProvider";
+import { PuzzleData } from "./PuzzleGenerator";
+import { Button } from "@/components/ui/button";
+import { generateCrossword } from "@/lib/gemini";
 
 const Home = () => {
   const { theme, setTheme } = useTheme();
-  const [puzzle, setPuzzle] = useState(null);
+  const [puzzle, setPuzzle] = useState<PuzzleData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [completedPuzzles, setCompletedPuzzles] = useState<PuzzleData[]>([]);
 
-  // Mock puzzle data for initial display
-  const mockPuzzle = {
+  // Initial puzzle data
+  const initialPuzzle: PuzzleData = {
     grid: [
       ["C", "R", "O", "S", "S"],
       ["W", "", "O", "", ""],
@@ -21,29 +25,83 @@ const Home = () => {
       ["D", "", "", "", ""],
     ],
     clues: {
-      across: [
-        { number: 1, clue: "A puzzle with words crossing", answer: "CROSS" },
-      ],
-      down: [
-        { number: 1, clue: "What this puzzle is called", answer: "CROSSWORD" },
-      ],
+      across: {
+        "1": "A puzzle with words crossing",
+      },
+      down: {
+        "1": "What this puzzle is called",
+      },
     },
+    size: 5,
   };
 
   useEffect(() => {
-    // Set mock puzzle data on initial load
+    // Set initial puzzle data on first load
     if (!puzzle) {
-      setPuzzle(mockPuzzle);
+      setPuzzle(initialPuzzle);
     }
   }, []);
 
-  const handlePuzzleGenerated = (newPuzzle) => {
+  const handlePuzzleGenerated = async (newPuzzle: PuzzleData) => {
     setIsLoading(true);
-    // Simulate API call delay
-    setTimeout(() => {
-      setPuzzle(newPuzzle || mockPuzzle);
+    try {
+      setPuzzle(newPuzzle);
+    } catch (error) {
+      console.error("Error setting puzzle:", error);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
+  };
+
+  const handlePuzzleCompleted = () => {
+    if (puzzle) {
+      setCompletedPuzzles([...completedPuzzles, puzzle]);
+      // Show completion animation or message
+    }
+  };
+
+  const generateRandomPuzzle = async () => {
+    setIsLoading(true);
+    try {
+      const themes = [
+        "general",
+        "science",
+        "history",
+        "geography",
+        "literature",
+      ];
+      const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+      const randomDifficulty = Math.floor(Math.random() * 100);
+
+      const newPuzzle = await generateCrossword(randomTheme, randomDifficulty);
+      setPuzzle(newPuzzle);
+    } catch (error) {
+      console.error("Error generating random puzzle:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sharePuzzle = () => {
+    // In a real implementation, this would generate a shareable link
+    alert("Sharing functionality would be implemented here!");
+  };
+
+  const downloadPuzzle = () => {
+    // In a real implementation, this would download the puzzle as PDF
+    if (!puzzle) return;
+
+    const puzzleData = JSON.stringify(puzzle, null, 2);
+    const blob = new Blob([puzzleData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crossword-puzzle-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const themeVariants = {
@@ -109,40 +167,78 @@ const Home = () => {
               Crossword Creator
             </motion.h1>
 
-            <div className="relative">
-              <motion.button
-                className={`p-2 rounded-full ${currentTheme.borderColor} border-2`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowThemeSelector(!showThemeSelector)}
-              >
-                <Settings className="h-5 w-5" />
-              </motion.button>
+            <div className="flex items-center gap-3">
+              {/* Action buttons */}
+              <AnimatePresence>
+                {puzzle && (
+                  <>
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className={`p-2 rounded-full ${currentTheme.borderColor} border-2`}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={sharePuzzle}
+                      title="Share puzzle"
+                    >
+                      <Share2 className="h-5 w-5" />
+                    </motion.button>
 
-              {showThemeSelector && (
-                <motion.div
-                  className={`absolute right-0 mt-2 p-2 rounded-md shadow-lg ${currentTheme.backgroundColor} border ${currentTheme.borderColor} z-10`}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className={`p-2 rounded-full ${currentTheme.borderColor} border-2`}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={downloadPuzzle}
+                      title="Download puzzle"
+                    >
+                      <Download className="h-5 w-5" />
+                    </motion.button>
+                  </>
+                )}
+              </AnimatePresence>
+
+              {/* Theme selector */}
+              <div className="relative">
+                <motion.button
+                  className={`p-2 rounded-full ${currentTheme.borderColor} border-2`}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowThemeSelector(!showThemeSelector)}
                 >
-                  <div className="flex flex-col gap-2">
-                    {Object.keys(themeVariants).map((themeName) => (
-                      <button
-                        key={themeName}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-md ${theme === themeName ? currentTheme.accentColor + " text-white" : "hover:bg-opacity-10 hover:bg-gray-500"}`}
-                        onClick={() => {
-                          setTheme(themeName);
-                          setShowThemeSelector(false);
-                        }}
-                      >
-                        {themeIconMap[themeName]}
-                        <span className="capitalize">{themeName}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
+                  <Settings className="h-5 w-5" />
+                </motion.button>
+
+                <AnimatePresence>
+                  {showThemeSelector && (
+                    <motion.div
+                      className={`absolute right-0 mt-2 p-2 rounded-md shadow-lg ${currentTheme.backgroundColor} border ${currentTheme.borderColor} z-10`}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
+                      <div className="flex flex-col gap-2">
+                        {Object.keys(themeVariants).map((themeName) => (
+                          <button
+                            key={themeName}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md ${theme === themeName ? currentTheme.accentColor + " text-white" : "hover:bg-opacity-10 hover:bg-gray-500"}`}
+                            onClick={() => {
+                              setTheme(themeName);
+                              setShowThemeSelector(false);
+                            }}
+                          >
+                            {themeIconMap[themeName]}
+                            <span className="capitalize">{themeName}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
@@ -173,6 +269,37 @@ const Home = () => {
                 isLoading={isLoading}
                 themeStyles={currentTheme}
               />
+
+              <div className="mt-4">
+                <Button
+                  onClick={generateRandomPuzzle}
+                  disabled={isLoading}
+                  className={`w-full ${currentTheme.buttonStyle}`}
+                  variant="outline"
+                >
+                  I'm Feeling Lucky
+                </Button>
+              </div>
+
+              {completedPuzzles.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-2">
+                    Completed Puzzles
+                  </h3>
+                  <div className="space-y-2">
+                    {completedPuzzles.map((p, index) => (
+                      <motion.div
+                        key={index}
+                        className={`p-2 rounded border ${currentTheme.borderColor} cursor-pointer`}
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => setPuzzle(p)}
+                      >
+                        Puzzle #{index + 1} ({p.size}x{p.size})
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -200,7 +327,10 @@ const Home = () => {
                   />
                 </div>
               ) : puzzle ? (
-                <CrosswordGrid puzzle={puzzle} themeStyles={currentTheme} />
+                <CrosswordGrid
+                  puzzleData={puzzle}
+                  onComplete={handlePuzzleCompleted}
+                />
               ) : (
                 <div className="flex justify-center items-center h-64 text-gray-500">
                   No puzzle generated yet
